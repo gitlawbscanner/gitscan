@@ -1,10 +1,15 @@
-const http = require('http');
-const fs   = require('fs');
-const path = require('path');
+const http  = require('http');
+const https = require('https');
+const fs    = require('fs');
+const path  = require('path');
+const { URL } = require('url');
 
 const PORT     = process.env.PORT || 3000;
 const DIST     = path.join(__dirname, 'dist');
 const DIST_ABS = path.resolve(DIST);
+
+// Backend URL for /api proxy — set at runtime, never baked into the client bundle
+const BACKEND = (process.env.BACKEND_URL || 'https://gitscan-production.up.railway.app').replace(/\/$/, '');
 
 const MIME = {
   '.html': 'text/html; charset=utf-8',
@@ -22,8 +27,41 @@ const MIME = {
   '.webp': 'image/webp',
 };
 
+function proxyToBackend(req, res, backendPath) {
+  let target;
+  try { target = new URL(backendPath, BACKEND); } catch {
+    res.writeHead(400); res.end('Bad gateway path'); return;
+  }
+  const isHttps = target.protocol === 'https:';
+  const opts = {
+    hostname: target.hostname,
+    port:     target.port || (isHttps ? 443 : 80),
+    path:     target.pathname + target.search,
+    method:   req.method,
+    headers:  Object.assign({}, req.headers, { host: target.hostname }),
+  };
+  const transport = isHttps ? https : http;
+  const proxyReq = transport.request(opts, proxyRes => {
+    // Forward CORS headers so browser doesn't block
+    const headers = Object.assign({}, proxyRes.headers, {
+      'access-control-allow-origin': '*',
+    });
+    res.writeHead(proxyRes.statusCode, headers);
+    proxyRes.pipe(res);
+  });
+  proxyReq.on('error', err => { res.writeHead(502); res.end('Backend unreachable'); });
+  req.pipe(proxyReq);
+}
+
 http.createServer((req, res) => {
   const raw = req.url.split('?')[0].split('#')[0];
+  const qs  = req.url.includes('?') ? '?' + req.url.split('?')[1] : '';
+
+  // Proxy /api/* to backend — so VITE_API_URL fallback '/api' always works
+  if (raw === '/api' || raw.startsWith('/api/')) {
+    const backendPath = raw.replace(/^\/api/, '') || '/';
+    return proxyToBackend(req, res, backendPath + qs);
+  }
 
   // Resolve to an absolute path and guard against path traversal
   let filePath;
@@ -52,5 +90,5 @@ http.createServer((req, res) => {
     res.end(data);
   });
 }).listen(PORT, '0.0.0.0', () => {
-  console.log(`gitscan frontend running on port ${PORT}`);
+  console.log(`gitscan frontend on :${PORT} — proxying /api/* → ${BACKEND}`);
 });

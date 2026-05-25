@@ -1,0 +1,54 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+*.egg-info/
+dist/
+build/
+.eggs/
+*.egg
+venv/
+.venv/
+env/
+.env/
+
+# Environment — NEVER commit real secrets
+backend/.env
+.env
+.env.local
+.env.production
+
+# Node
+node_modules/
+**/node_modules/
+app/dist/
+app/build/
+*.tsbuildinfo
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Logs
+*.log
+logs/
+
+# Temp
+*.tmp
+*.temp
+/tmp/
+
+# Local artifacts
+app/git
+backend/scan_stats.json
+gitscan-extension.zip
+screenshot_store.png

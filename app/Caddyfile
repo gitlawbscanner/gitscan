@@ -1,0 +1,19 @@
+{
+	admin off
+}
+
+:{$PORT:3000} {
+	root * /app/dist
+
+	handle /api/* {
+		uri strip_prefix /api
+		reverse_proxy {$BACKEND_URL:https://gitscan-production.up.railway.app}
+	}
+
+	handle {
+		try_files {path} /index.html
+		file_server
+	}
+
+	encode gzip
+}

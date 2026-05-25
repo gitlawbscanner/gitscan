@@ -1,0 +1,714 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>gitscan</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&display=swap');
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      width: 480px;
+      background: #050505;
+      color: #fff;
+      font-family: 'IBM Plex Mono', 'Courier New', monospace;
+      overflow-x: hidden;
+    }
+
+    /* ── Grid bg ── */
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      background-image:
+        linear-gradient(rgba(255,255,255,0.012) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255,255,255,0.012) 1px, transparent 1px);
+      background-size: 32px 32px;
+      z-index: 0;
+    }
+
+    /* ── Header ── */
+    #header {
+      position: relative;
+      z-index: 1;
+      padding: 16px 20px 14px;
+      border-bottom: 1px solid rgba(255,255,255,0.07);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      background: rgba(0,0,0,0.6);
+    }
+
+    #logo-wrap {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    #logo-icon {
+      width: 32px;
+      height: 32px;
+      flex-shrink: 0;
+    }
+
+    #brand-text {
+      display: flex;
+      flex-direction: column;
+      gap: 1px;
+    }
+
+    #brand-name {
+      font-size: 14px;
+      font-weight: 500;
+      letter-spacing: 0.14em;
+      color: #fff;
+    }
+
+    #brand-sub {
+      font-size: 8px;
+      letter-spacing: 0.18em;
+      color: rgba(255,255,255,0.28);
+      text-transform: uppercase;
+    }
+
+    #live-dot {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+    }
+
+    #live-dot .dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: #44ff88;
+      box-shadow: 0 0 8px #44ff88;
+      animation: pulse 1.5s ease-in-out infinite;
+    }
+
+    #live-dot span {
+      font-size: 9px;
+      color: rgba(68,255,136,0.6);
+      letter-spacing: 0.12em;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.4; }
+    }
+
+    /* ── Main ── */
+    #main {
+      position: relative;
+      z-index: 1;
+      padding: 18px 20px 20px;
+    }
+
+    /* URL detected bar */
+    #detected-bar {
+      display: none;
+      background: rgba(255,255,255,0.03);
+      border: 1px solid rgba(255,255,255,0.09);
+      border-left: 3px solid rgba(255,255,255,0.2);
+      padding: 10px 14px;
+      margin-bottom: 10px;
+    }
+
+    #detected-label {
+      font-size: 8px;
+      letter-spacing: 0.14em;
+      color: rgba(255,255,255,0.3);
+      text-transform: uppercase;
+      margin-bottom: 4px;
+    }
+
+    #detected-url {
+      font-size: 11px;
+      color: rgba(255,255,255,0.7);
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    /* No repo notice */
+    #no-repo {
+      display: none;
+      padding: 10px 14px;
+      margin-bottom: 10px;
+      font-size: 10px;
+      color: rgba(255,255,255,0.25);
+      border: 1px dashed rgba(255,255,255,0.08);
+      line-height: 1.6;
+    }
+
+    /* Input */
+    #url-input {
+      display: none;
+      width: 100%;
+      background: rgba(255,255,255,0.03);
+      border: 1px solid rgba(255,255,255,0.12);
+      color: #fff;
+      padding: 11px 14px;
+      font-family: inherit;
+      font-size: 11px;
+      outline: none;
+      margin-bottom: 10px;
+      transition: border-color 0.2s;
+    }
+
+    #url-input:focus { border-color: rgba(255,255,255,0.35); }
+    #url-input::placeholder { color: rgba(255,255,255,0.2); }
+
+    #toggle-input {
+      display: none;
+      background: transparent;
+      border: none;
+      color: rgba(255,255,255,0.25);
+      font-family: inherit;
+      font-size: 9px;
+      letter-spacing: 0.08em;
+      cursor: pointer;
+      padding: 0;
+      margin-bottom: 12px;
+      text-decoration: underline;
+    }
+
+    /* Scan button */
+    #scan-btn {
+      width: 100%;
+      padding: 13px;
+      background: #fff;
+      color: #000;
+      border: none;
+      font-family: inherit;
+      font-size: 12px;
+      font-weight: 500;
+      letter-spacing: 0.16em;
+      text-transform: uppercase;
+      cursor: pointer;
+      transition: all 0.2s;
+      position: relative;
+      overflow: hidden;
+    }
+
+    #scan-btn::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(90deg, transparent 0%, rgba(0,0,0,0.06) 50%, transparent 100%);
+    }
+
+    #scan-btn:hover { background: rgba(255,255,255,0.88); }
+    #scan-btn:disabled { opacity: 0.25; cursor: not-allowed; }
+
+    #scan-btn.scanning {
+      background: transparent;
+      color: rgba(255,255,255,0.35);
+      border: 1px solid rgba(255,255,255,0.1);
+    }
+
+    /* Error */
+    #error-box {
+      display: none;
+      margin-top: 10px;
+      padding: 10px 14px;
+      border: 1px solid rgba(255,68,68,0.25);
+      background: rgba(255,68,68,0.04);
+      font-size: 10px;
+      color: rgba(255,120,120,0.9);
+      line-height: 1.6;
+    }
+
+    /* ── Status (scanning) ── */
+    #status {
+      display: none;
+      margin-top: 16px;
+    }
+
+    /* Stages */
+    #stages {
+      display: flex;
+      align-items: flex-start;
+      margin-bottom: 14px;
+    }
+
+    .stage { display: flex; flex-direction: column; align-items: center; gap: 5px; }
+
+    .stage-dot {
+      width: 7px; height: 7px; border-radius: 50%;
+      background: rgba(255,255,255,0.08);
+      transition: all 0.3s;
+    }
+    .stage-dot.done { background: rgba(255,255,255,0.3); }
+    .stage-dot.active {
+      background: #fff;
+      box-shadow: 0 0 10px rgba(255,255,255,0.9);
+      animation: stagePulse 1s ease-in-out infinite;
+    }
+    @keyframes stagePulse {
+      0%,100% { box-shadow: 0 0 10px rgba(255,255,255,0.9); }
+      50% { box-shadow: 0 0 18px rgba(255,255,255,0.5); }
+    }
+
+    .stage-label {
+      font-size: 7px;
+      letter-spacing: 0.1em;
+      color: rgba(255,255,255,0.15);
+      text-transform: uppercase;
+      white-space: nowrap;
+    }
+    .stage-label.active { color: rgba(255,255,255,0.65); }
+
+    .stage-line {
+      flex: 1;
+      height: 1px;
+      background: rgba(255,255,255,0.07);
+      margin: 3px 4px 0;
+      transition: background 0.4s;
+    }
+    .stage-line.done { background: rgba(255,255,255,0.25); }
+
+    /* Terminal */
+    #terminal {
+      border: 1px solid rgba(255,255,255,0.08);
+      background: rgba(0,0,0,0.7);
+    }
+
+    #terminal-header {
+      padding: 7px 12px;
+      border-bottom: 1px solid rgba(255,255,255,0.06);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .term-dots { display: flex; gap: 5px; }
+    .term-dots span {
+      width: 7px; height: 7px; border-radius: 50%;
+      background: rgba(255,255,255,0.08);
+    }
+
+    #term-title {
+      font-size: 9px;
+      color: rgba(255,255,255,0.18);
+      letter-spacing: 0.08em;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      max-width: 60%;
+    }
+
+    #term-live {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      font-size: 9px;
+      color: rgba(68,255,136,0.5);
+    }
+
+    #term-live .d {
+      width: 5px; height: 5px; border-radius: 50%;
+      background: #44ff88;
+      animation: pulse 1.2s ease-in-out infinite;
+    }
+
+    #log-box {
+      padding: 10px 14px;
+      height: 110px;
+      overflow-y: auto;
+      scrollbar-width: thin;
+      scrollbar-color: rgba(255,255,255,0.08) transparent;
+    }
+
+    .log-line {
+      display: flex;
+      gap: 8px;
+      line-height: 1.75;
+      font-size: 10px;
+    }
+
+    .log-prompt { color: rgba(255,255,255,0.15); flex-shrink: 0; }
+    .log-text { color: rgba(255,255,255,0.5); }
+
+    #cursor {
+      display: inline-block;
+      width: 6px; height: 12px;
+      background: rgba(255,255,255,0.5);
+      animation: blink 1s step-end infinite;
+      vertical-align: middle;
+      margin-left: 2px;
+    }
+    @keyframes blink { 0%,100%{opacity:1;} 50%{opacity:0;} }
+
+    /* ── Result ── */
+    #result {
+      display: none;
+      margin-top: 16px;
+    }
+
+    #result-card {
+      border: 1px solid rgba(255,255,255,0.1);
+      overflow: hidden;
+    }
+
+    #result-top {
+      padding: 18px 20px;
+      display: flex;
+      align-items: center;
+      gap: 18px;
+    }
+
+    #score-circle {
+      width: 68px;
+      height: 68px;
+      border-radius: 50%;
+      border: 2px solid;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      position: relative;
+    }
+
+    #score-num {
+      font-size: 26px;
+      font-weight: 400;
+      line-height: 1;
+    }
+
+    #score-label {
+      font-size: 7px;
+      letter-spacing: 0.1em;
+      color: rgba(255,255,255,0.3);
+      text-transform: uppercase;
+    }
+
+    #result-info { flex: 1; min-width: 0; }
+
+    #severity-badge {
+      display: inline-block;
+      font-size: 9px;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      padding: 3px 10px;
+      border: 1px solid;
+      margin-bottom: 8px;
+    }
+
+    #summary-text {
+      font-size: 10px;
+      color: rgba(255,255,255,0.45);
+      line-height: 1.7;
+    }
+
+    /* Recommendations */
+    #recs {
+      display: none;
+      border-top: 1px solid rgba(255,255,255,0.07);
+      padding: 12px 20px;
+      background: rgba(255,255,255,0.015);
+    }
+
+    #recs-title {
+      font-size: 8px;
+      letter-spacing: 0.14em;
+      color: rgba(255,255,255,0.25);
+      text-transform: uppercase;
+      margin-bottom: 8px;
+    }
+
+    .rec-item {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 6px;
+      font-size: 10px;
+      line-height: 1.5;
+    }
+
+    .rec-num { color: rgba(255,255,255,0.2); flex-shrink: 0; }
+    .rec-text { color: rgba(255,255,255,0.5); }
+
+    /* Actions */
+    #result-actions {
+      border-top: 1px solid rgba(255,255,255,0.07);
+      padding: 12px 20px;
+      display: flex;
+      gap: 8px;
+    }
+
+    .result-btn {
+      flex: 1;
+      padding: 9px 12px;
+      background: transparent;
+      border: 1px solid rgba(255,255,255,0.12);
+      color: rgba(255,255,255,0.45);
+      font-family: inherit;
+      font-size: 10px;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      cursor: pointer;
+      transition: all 0.2s;
+      text-align: center;
+      text-decoration: none;
+      display: block;
+    }
+
+    .result-btn:hover { color: #fff; border-color: rgba(255,255,255,0.35); }
+
+    .result-btn.primary {
+      background: #fff;
+      color: #000;
+      border-color: #fff;
+      font-weight: 500;
+    }
+
+    .result-btn.primary:hover { background: rgba(255,255,255,0.88); }
+
+    /* ── Footer ── */
+    #footer {
+      position: relative;
+      z-index: 1;
+      padding: 8px 20px;
+      border-top: 1px solid rgba(255,255,255,0.05);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    #footer-left {
+      font-size: 8px;
+      color: rgba(255,255,255,0.15);
+      letter-spacing: 0.08em;
+    }
+
+    #open-site {
+      font-size: 8px;
+      color: rgba(255,255,255,0.2);
+      letter-spacing: 0.08em;
+      text-decoration: none;
+      transition: color 0.15s;
+    }
+
+    #open-site:hover { color: rgba(255,255,255,0.5); }
+
+    /* ── Card preview overlay ── */
+    #card-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.92);
+      z-index: 100;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 16px;
+      backdrop-filter: blur(8px);
+      animation: overlayIn 0.18s ease;
+    }
+    @keyframes overlayIn {
+      from { opacity: 0; transform: scale(0.97); }
+      to   { opacity: 1; transform: scale(1); }
+    }
+    #card-overlay.visible { display: flex; }
+
+    #card-preview-wrap {
+      position: relative;
+    }
+
+    #card-preview-img {
+      width: 248px;
+      height: auto;
+      display: block;
+      border: 1px solid rgba(255,255,255,0.08);
+    }
+
+    #card-overlay-actions {
+      display: flex;
+      gap: 8px;
+      width: 248px;
+    }
+
+    .overlay-btn {
+      flex: 1;
+      padding: 11px 8px;
+      font-family: inherit;
+      font-size: 10px;
+      font-weight: 500;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      border: none;
+      cursor: pointer;
+      transition: all 0.15s;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+    }
+
+    #card-download-btn {
+      background: #fff;
+      color: #000;
+    }
+    #card-download-btn:hover { background: rgba(255,255,255,0.88); }
+
+    #card-tweet-btn {
+      background: #0f0f0f;
+      color: #fff;
+      border: 1px solid rgba(255,255,255,0.15);
+    }
+    #card-tweet-btn:hover { border-color: rgba(255,255,255,0.4); background: #1a1a1a; }
+
+    #card-overlay-hint {
+      font-size: 9px;
+      color: rgba(255,255,255,0.18);
+      letter-spacing: 0.08em;
+      text-align: center;
+      line-height: 1.6;
+      width: 248px;
+    }
+
+    #card-overlay-close {
+      font-size: 9px;
+      color: rgba(255,255,255,0.18);
+      background: none;
+      border: none;
+      font-family: inherit;
+      letter-spacing: 0.12em;
+      cursor: pointer;
+      padding: 4px 12px;
+      text-transform: uppercase;
+      transition: color 0.15s;
+    }
+    #card-overlay-close:hover { color: rgba(255,255,255,0.5); }
+  </style>
+</head>
+<body>
+
+  <!-- Header -->
+  <div id="header">
+    <div id="logo-wrap">
+      <svg id="logo-icon" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <rect width="32" height="32" fill="#000"/>
+        <!-- Corner brackets -->
+        <path d="M3 9 L3 3 L9 3" stroke="rgba(255,255,255,0.5)" stroke-width="1.5" fill="none" stroke-linecap="square"/>
+        <path d="M23 3 L29 3 L29 9" stroke="rgba(255,255,255,0.5)" stroke-width="1.5" fill="none" stroke-linecap="square"/>
+        <path d="M3 23 L3 29 L9 29" stroke="rgba(255,255,255,0.5)" stroke-width="1.5" fill="none" stroke-linecap="square"/>
+        <path d="M29 23 L29 29 L23 29" stroke="rgba(255,255,255,0.5)" stroke-width="1.5" fill="none" stroke-linecap="square"/>
+        <!-- Scan line -->
+        <line x1="5" y1="16" x2="27" y2="16" stroke="#44ff88" stroke-width="0.8" opacity="0.6"/>
+        <!-- G letter -->
+        <text x="16" y="20.5" text-anchor="middle" fill="white" font-family="monospace" font-size="13" font-weight="400">G</text>
+      </svg>
+      <div id="brand-text">
+        <div id="brand-name">gitscan</div>
+        <div id="brand-sub">Security Scanner</div>
+      </div>
+    </div>
+    <div id="live-dot">
+      <div class="dot"></div>
+      <span>LIVE</span>
+    </div>
+  </div>
+
+  <!-- Main -->
+  <div id="main">
+
+    <!-- Detected repo -->
+    <div id="detected-bar">
+      <div id="detected-label">Detected Repo</div>
+      <div id="detected-url"></div>
+    </div>
+
+    <!-- No repo notice -->
+    <div id="no-repo">
+      Not on a GitHub or Gitlawb repo page.<br/>
+      Paste any repo URL below to scan.
+    </div>
+
+    <!-- Manual URL input -->
+    <input id="url-input" type="text" placeholder="github.com/user/repo · gitlawb.com/z6Mk.../repo" />
+
+    <!-- Toggle between detected and manual -->
+    <button id="toggle-input">+ paste a different URL</button>
+
+    <!-- Scan button -->
+    <button id="scan-btn">SCAN THIS REPO →</button>
+
+    <!-- Error -->
+    <div id="error-box"></div>
+
+    <!-- Status while scanning -->
+    <div id="status">
+      <div id="stages"></div>
+      <div id="terminal">
+        <div id="terminal-header">
+          <div class="term-dots">
+            <span></span><span></span><span></span>
+          </div>
+          <div id="term-title">glscan — waiting...</div>
+          <div id="term-live"><div class="d"></div>LIVE</div>
+        </div>
+        <div id="log-box">
+          <span id="cursor"></span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Result -->
+    <div id="result">
+      <div id="result-card">
+        <div id="result-top">
+          <div id="score-circle">
+            <span id="score-num">—</span>
+            <span id="score-label">Risk</span>
+          </div>
+          <div id="result-info">
+            <span id="severity-badge">—</span>
+            <div id="summary-text"></div>
+          </div>
+        </div>
+        <div id="recs">
+          <div id="recs-title">Top Recommendations</div>
+          <div id="recs-list"></div>
+        </div>
+        <div id="result-actions">
+          <a id="report-btn" class="result-btn primary" target="_blank">VIEW REPORT →</a>
+          <button id="card-btn" class="result-btn">⬡ SHARE CARD</button>
+          <button id="rescan-btn" class="result-btn">↺</button>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Footer -->
+  <div id="footer">
+    <span id="footer-left">gitscan v1.0</span>
+    <a id="open-site" href="https://gitscan.up.railway.app" target="_blank">Open gitscan ↗</a>
+  </div>
+
+  <!-- Card preview overlay -->
+  <div id="card-overlay">
+    <div id="card-preview-wrap">
+      <img id="card-preview-img" />
+    </div>
+    <div id="card-overlay-actions">
+      <button id="card-download-btn">
+        <svg width="11" height="11" viewBox="0 0 12 12" fill="none"><path d="M6 1v7M3 6l3 3 3-3M1 11h10" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+        Download
+      </button>
+      <button id="card-tweet-btn">
+        <svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-4.714-6.231-5.401 6.231H2.744l7.73-8.835L1.254 2.25H8.08l4.253 5.622zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>
+        Share on X
+      </button>
+    </div>
+    <div id="card-overlay-hint">Download the card, then attach it when sharing on X</div>
+    <button id="card-overlay-close">✕ close</button>
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>

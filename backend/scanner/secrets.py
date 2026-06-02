@@ -20,16 +20,32 @@ REGEX_PATTERNS = {
     "Stripe Key":         r"(?:sk|pk)_(test|live)_[a-zA-Z0-9]{24,}",
 }
 
-SKIP_DIRS  = {".git", "node_modules", "__pycache__", ".venv", "venv", "dist", "build", ".next"}
-SKIP_EXTS  = {".png", ".jpg", ".jpeg", ".gif", ".ico", ".svg", ".woff", ".woff2",
-              ".ttf", ".eot", ".mp4", ".mp3", ".zip", ".tar", ".gz", ".pdf",
-              ".lock", ".sum", ".min.js", ".min.css"}
+SKIP_DIRS = {
+    ".git", "node_modules", "__pycache__", ".venv", "venv", "vendor",
+    "dist", "build", ".next", "out", "coverage", ".turbo", ".cache",
+    "__tests__", "fixtures", "testdata", ".nuxt", ".output",
+    "storybook-static", "generated", "gen", ".pytest_cache",
+    "test", "tests", "spec", "e2e", "cypress",
+}
+SKIP_EXTS = {".png", ".jpg", ".jpeg", ".gif", ".ico", ".svg", ".woff", ".woff2",
+             ".ttf", ".eot", ".mp4", ".mp3", ".zip", ".tar", ".gz", ".pdf",
+             ".lock", ".sum", ".min.js", ".min.css"}
 # Example/template files contain placeholder values, not real secrets
 SKIP_FILENAMES = {
     ".env.example", ".env.template", ".env.sample", ".env.test",
     ".env.development", ".env.staging", "example.env", "sample.env",
     ".env.local.example",
 }
+# Test file patterns — security values in tests are intentionally fake
+TEST_FILE_RE = re.compile(
+    r"(?:\.test\.|\.spec\.|_test\.|_spec\.)|(?:test_|spec_)"
+)
+# Placeholder values — common dummy tokens in docs/examples
+_PLACEHOLDER_RE = re.compile(
+    r"(?i)(xxx|your[_\-]?(?:key|token|secret|api)|example|placeholder|changeme|"
+    r"replace.?me|xxxxxxxx|12345678|<[^>]+>|my[_\-]?(?:key|token|secret)|"
+    r"dummy|fake|sample|test[_\-]?(?:key|token)|insert[_\-]?(?:key|token))"
+)
 MAX_FILE_BYTES = 500_000
 
 
@@ -72,6 +88,8 @@ async def _regex_scan(repo_path: str) -> dict:
                 continue
             if any(fname.endswith(ext) for ext in SKIP_EXTS):
                 continue
+            if TEST_FILE_RE.search(fname):
+                continue
             fpath = os.path.join(root, fname)
             try:
                 if os.path.getsize(fpath) > MAX_FILE_BYTES:
@@ -80,8 +98,11 @@ async def _regex_scan(repo_path: str) -> dict:
                     content = f.read()
                 for pattern_name, pattern in REGEX_PATTERNS.items():
                     for match in re.finditer(pattern, content):
-                        line_no = content[: match.start()].count("\n") + 1
                         matched = match.group(0)
+                        # Skip obvious placeholder values
+                        if _PLACEHOLDER_RE.search(matched):
+                            continue
+                        line_no = content[: match.start()].count("\n") + 1
                         # Redact long values
                         if len(matched) > 60:
                             matched = matched[:30] + "...[REDACTED]"

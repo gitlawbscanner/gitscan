@@ -138,13 +138,13 @@ async def _scan_node(repo_path: str) -> dict:
         try:
             with open(pkg_path) as f:
                 pkg = json.load(f)
-            deps = {}
-            deps.update(pkg.get("dependencies", {}))
-            deps.update(pkg.get("devDependencies", {}))
-            packages = [
-                {"name": k, "version": re.sub(r"[^0-9\.]", "", v)[:20]}
-                for k, v in deps.items()
-            ]
+            runtime_deps = pkg.get("dependencies", {})
+            dev_deps = pkg.get("devDependencies", {})
+            packages = []
+            for k, v in runtime_deps.items():
+                packages.append({"name": k, "version": re.sub(r"[^0-9\.]", "", v)[:20], "is_dev": False})
+            for k, v in dev_deps.items():
+                packages.append({"name": k, "version": re.sub(r"[^0-9\.]", "", v)[:20], "is_dev": True})
             return await _query_osv(packages, "npm")
         except Exception:
             pass
@@ -234,14 +234,20 @@ async def _query_osv(packages: list, ecosystem: str) -> dict:
             vulns = result.get("vulns", [])
             if vulns:
                 pkg = packages[i] if i < len(packages) else {}
+                is_dev = pkg.get("is_dev", False)
                 for v in vulns:
+                    sev = _extract_severity(v)
+                    # Dev dependencies only matter if critical; downgrade others
+                    if is_dev and sev in ("high", "medium", "low"):
+                        sev = "low"
                     findings.append({
                         "ecosystem": ecosystem,
                         "package": pkg.get("name"),
                         "version": pkg.get("version"),
                         "vuln_id": v.get("id"),
                         "summary": v.get("summary", ""),
-                        "severity": _extract_severity(v),
+                        "severity": sev,
+                        "is_dev": is_dev,
                         "references": [r.get("url") for r in v.get("references", [])[:2]],
                     })
     except Exception as e:

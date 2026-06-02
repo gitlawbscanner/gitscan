@@ -308,6 +308,16 @@ async def run_full_scan(job_id: str, repo_url: str, branch: str = "main"):
 
         report = await analyze_with_claude(repo_url, raw)
 
+        # Embed raw counts so the frontend radar chart has data without re-fetching
+        report["raw_counts"] = {
+            "secrets": sc,
+            "sast": sa,
+            "deps": dc,
+            "malware": mc,
+            "malware_crit": raw["malware"].get("critical", 0),
+            "malware_high": raw["malware"].get("high", 0),
+        }
+
         risk = report.get("risk_score", "?")
         severity = report.get("severity", "").upper()
         _log(job_id, f"Analysis complete — Risk score: {risk} ({severity})")

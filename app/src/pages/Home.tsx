@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
 import Hero from '../sections/Hero';
 import StatsBar from '../sections/StatsBar';
+import LiveScanTicker from '../components/LiveScanTicker';
 import ScanSection from '../sections/ScanSection';
 import HowItWorks from '../sections/HowItWorks';
 import Features from '../sections/Features';
@@ -27,6 +28,7 @@ export default function Home() {
       <main>
         <Hero />
         <StatsBar />
+        <LiveScanTicker />
         <ScanSection />
         <HowItWorks />
         <Features />

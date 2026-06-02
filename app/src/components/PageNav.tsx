@@ -2,9 +2,13 @@ import { Link, useLocation } from 'react-router-dom';
 
 const LINKS = [
   { to: '/', label: 'Scan' },
+  { to: '/search', label: 'Search' },
+  { to: '/compare', label: 'Compare' },
   { to: '/activity', label: 'Latest' },
   { to: '/trending', label: 'Trending' },
   { to: '/intel', label: 'Intel' },
+  { to: '/install', label: 'Install' },
+  { to: '/api-docs', label: 'API' },
   { to: '/bot', label: 'Bot' },
 ];
 
@@ -21,7 +25,7 @@ export default function PageNav() {
       <Link to="/" style={{ textDecoration: 'none' }}>
         <img src="/logo.png" alt="gitscan" style={{ height: 24, display: 'block' }} />
       </Link>
-      <div style={{ display: 'flex', gap: 28, alignItems: 'center' }}>
+      <div style={{ display: 'flex', gap: 20, alignItems: 'center', flexWrap: 'wrap' }}>
         {LINKS.map(({ to, label }) => {
           const active = pathname === to;
           return (

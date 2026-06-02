@@ -4,9 +4,9 @@ import re
 import uuid
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, BackgroundTasks, HTTPException
+from fastapi import FastAPI, BackgroundTasks, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, Response
 from pydantic import BaseModel
 from typing import Optional
 
@@ -224,6 +224,48 @@ async def privacy_policy():
 </div>
 </body>
 </html>"""
+
+
+@app.get("/search")
+async def search_repos(q: str = Query("", min_length=0), limit: int = Query(20, le=100)):
+    scans = await database.get_recent(500) if database.is_enabled() else recent_scans
+    q = q.strip().lower()
+    if not q:
+        return scans[:limit]
+    results = [s for s in scans if q in (s.get("repo_url") or "").lower()]
+    return results[:limit]
+
+
+@app.get("/badge")
+async def get_badge(repo: str = Query(...)):
+    scans = await database.get_recent(500) if database.is_enabled() else recent_scans
+    match = next((s for s in scans if (s.get("repo_url") or "").lower().rstrip("/") == repo.lower().rstrip("/")), None)
+
+    if not match:
+        color, label, score = "9e9e9e", "not scanned", "?"
+    else:
+        sev = match.get("severity", "unknown").lower()
+        score = match.get("risk_score", "?")
+        color = {"critical": "d32f2f", "high": "f57c00", "medium": "f9a825", "low": "388e3c", "clean": "388e3c"}.get(sev, "9e9e9e")
+        label = sev.upper()
+
+    svg = f"""<svg xmlns="http://www.w3.org/2000/svg" width="180" height="20">
+  <linearGradient id="b" x2="0" y2="100%"><stop offset="0" stop-color="#bbb" stop-opacity=".1"/>
+    <stop offset="1" stop-opacity=".1"/></linearGradient>
+  <clipPath id="r"><rect width="180" height="20" rx="3" fill="#fff"/></clipPath>
+  <g clip-path="url(#r)">
+    <rect width="110" height="20" fill="#555"/>
+    <rect x="110" width="70" height="20" fill="#{color}"/>
+    <rect width="180" height="20" fill="url(#b)"/>
+  </g>
+  <g fill="#fff" text-anchor="middle" font-family="DejaVu Sans,Verdana,Geneva,sans-serif" font-size="11">
+    <text x="55" y="15" fill="#010101" fill-opacity=".3">gitscan score</text>
+    <text x="55" y="14">gitscan score</text>
+    <text x="145" y="15" fill="#010101" fill-opacity=".3">{score} · {label}</text>
+    <text x="145" y="14">{score} · {label}</text>
+  </g>
+</svg>"""
+    return Response(content=svg, media_type="image/svg+xml", headers={"Cache-Control": "max-age=300"})
 
 
 @app.get("/health")

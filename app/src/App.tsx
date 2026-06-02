@@ -8,6 +8,10 @@ import IntelPage from './pages/IntelPage';
 import ReportPage from './pages/ReportPage';
 import TrendingPage from './pages/TrendingPage';
 import PrivacyPage from './pages/PrivacyPage';
+import SearchPage from './pages/SearchPage';
+import ComparePage from './pages/ComparePage';
+import InstallPage from './pages/InstallPage';
+import ApiDocsPage from './pages/ApiDocsPage';
 import PageTransition from './components/PageTransition';
 
 function App() {
@@ -34,6 +38,10 @@ function App() {
         <Route path="/report/:jobId" element={<ReportPage />} />
         <Route path="/trending" element={<TrendingPage />} />
         <Route path="/privacy" element={<PrivacyPage />} />
+        <Route path="/search" element={<SearchPage />} />
+        <Route path="/compare" element={<ComparePage />} />
+        <Route path="/install" element={<InstallPage />} />
+        <Route path="/api-docs" element={<ApiDocsPage />} />
       </Routes>
     </PageTransition>
   );

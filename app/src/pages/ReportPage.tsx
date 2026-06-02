@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import PageNav from '../components/PageNav';
+import RadarChart from '../components/RadarChart';
 
 const API = import.meta.env.VITE_API_URL || '/api';
 
@@ -112,8 +113,17 @@ export default function ReportPage() {
   const badgeUrl = `${window.location.origin}/report/${jobId}`;
   const badgeMd = `[![gitscan score](https://img.shields.io/badge/gitscan-${report?.risk_score || '?'}%2F100-${report?.severity === 'critical' ? 'red' : report?.severity === 'high' ? 'orange' : report?.severity === 'medium' ? 'yellow' : 'brightgreen'})](${badgeUrl})`;
 
+  const isCritical = report?.severity === 'critical' || (report?.risk_score ?? 0) >= 85;
+
   return (
-    <div style={{ background: '#000', minHeight: '100vh', color: '#fff' }}>
+    <div style={{ background: '#000', minHeight: '100vh', color: '#fff', position: 'relative', overflow: 'hidden' }}>
+      {/* Critical threat atmosphere */}
+      {isCritical && (
+        <>
+          <div style={{ position: 'fixed', inset: 0, background: 'radial-gradient(ellipse at 50% -20%, rgba(255,40,40,0.08) 0%, transparent 65%)', pointerEvents: 'none', zIndex: 0 }} />
+          <div style={{ position: 'fixed', top: 0, left: 0, right: 0, height: 2, background: 'linear-gradient(to right, transparent, #ff4444, transparent)', animation: 'scan-line 3s ease-in-out infinite', pointerEvents: 'none', zIndex: 1 }} />
+        </>
+      )}
       <PageNav />
 
       <div style={{ maxWidth: 860, margin: '0 auto', padding: 'clamp(88px,11vw,130px) clamp(16px,4vw,32px) 80px' }}>
@@ -192,17 +202,30 @@ export default function ReportPage() {
               <code style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 9, color: 'rgba(255,255,255,0.35)', flex: 1, overflow: 'auto', whiteSpace: 'nowrap', minWidth: 0 }}>{badgeMd}</code>
             </div>
 
-            {/* Score + summary */}
-            <div style={{ border: `1px solid ${sevColor}22`, background: sevDim, padding: '28px 32px', marginBottom: 28, display: 'flex', gap: 32, alignItems: 'center', flexWrap: 'wrap' }}>
-              <RiskArc score={report.risk_score} severity={report.severity} />
-              <div style={{ flex: 1, minWidth: 200 }}>
-                <p style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 11, letterSpacing: '0.12em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.3)', margin: '0 0 10px' }}>AI SUMMARY</p>
-                <p style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 13, color: 'rgba(255,255,255,0.75)', lineHeight: 1.75, margin: 0 }}>{report.summary}</p>
-                {report.gitlawb_notes && (
-                  <p style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 11, color: 'rgba(100,140,255,0.7)', lineHeight: 1.6, margin: '12px 0 0', borderLeft: '2px solid rgba(100,140,255,0.3)', paddingLeft: 12 }}>
-                    ⬡ {report.gitlawb_notes}
-                  </p>
-                )}
+            {/* Score + radar + summary */}
+            <div style={{ border: `1px solid ${sevColor}22`, background: sevDim, padding: '28px 32px', marginBottom: 28 }}>
+              <div style={{ display: 'flex', gap: 32, alignItems: 'center', flexWrap: 'wrap', marginBottom: 24 }}>
+                <RiskArc score={report.risk_score} severity={report.severity} />
+                <RadarChart
+                  color={sevColor}
+                  size={200}
+                  data={{
+                    secrets:   Math.min(100, (report.raw_counts?.secrets ?? 0) * 20),
+                    sast:      Math.min(100, (report.raw_counts?.sast ?? 0) * 12),
+                    deps:      Math.min(100, (report.raw_counts?.deps ?? 0) * 10),
+                    malware:   Math.min(100, ((report.raw_counts?.malware_crit ?? 0) * 35 + (report.raw_counts?.malware_high ?? 0) * 15)),
+                    integrity: report.risk_score > 0 ? Math.max(0, 100 - report.risk_score) : 100,
+                  }}
+                />
+                <div style={{ flex: 1, minWidth: 180 }}>
+                  <p style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 11, letterSpacing: '0.12em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.3)', margin: '0 0 10px' }}>AI SUMMARY</p>
+                  <p style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 13, color: 'rgba(255,255,255,0.75)', lineHeight: 1.75, margin: 0 }}>{report.summary}</p>
+                  {report.gitlawb_notes && (
+                    <p style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 11, color: 'rgba(100,140,255,0.7)', lineHeight: 1.6, margin: '12px 0 0', borderLeft: '2px solid rgba(100,140,255,0.3)', paddingLeft: 12 }}>
+                      ⬡ {report.gitlawb_notes}
+                    </p>
+                  )}
+                </div>
               </div>
             </div>
 
@@ -233,6 +256,18 @@ export default function ReportPage() {
           </>
         )}
       </div>
+      <style>{`
+        @keyframes scan-line {
+          0%   { top: 0; opacity: 0; }
+          10%  { opacity: 1; }
+          90%  { opacity: 1; }
+          100% { top: 100vh; opacity: 0; }
+        }
+        @keyframes radar-pulse {
+          0%   { transform: translate(-50%,-50%) scale(0.9); opacity: 0.7; }
+          100% { transform: translate(-50%,-50%) scale(1.35); opacity: 0; }
+        }
+      `}</style>
     </div>
   );
 }

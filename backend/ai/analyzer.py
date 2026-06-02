@@ -55,11 +55,13 @@ def _build_prompt(repo_url: str, raw: dict) -> str:
     secrets_findings  = raw.get("secrets", {}).get("findings", [])
     sast_findings     = raw.get("sast", {}).get("findings", [])
     deps_findings     = raw.get("dependencies", {}).get("findings", [])
+    deps_runtime      = [f for f in deps_findings if not f.get("is_dev")]
+    deps_dev          = [f for f in deps_findings if f.get("is_dev")]
     malware_findings  = raw.get("malware", {}).get("findings", [])
 
     secrets_count = len(secrets_findings)
     sast_count    = len(sast_findings)
-    deps_count    = len(deps_findings)
+    deps_count    = len(deps_runtime)  # only count runtime deps toward score
     malware_count = len(malware_findings)
     malware_crit  = raw.get("malware", {}).get("critical", 0)
 
@@ -79,7 +81,7 @@ SCAN RESULTS (all findings are already deduplicated — each entry is a unique i
 - Secrets found: {secrets_count}
 - SAST issues: {sast_count} unique rules triggered (tool: {sast_tool})
   Severity breakdown: {sast_bd['high']} high, {sast_bd['medium']} medium, {sast_bd['low']} low
-- Vulnerable dependencies: {deps_count}
+- Vulnerable dependencies: {len(deps_findings)} total ({len(deps_runtime)} runtime, {len(deps_dev)} dev-only — dev deps count 3× less)
 - Malware indicators: {malware_count} ({malware_crit} critical)
 
 SECRETS SAMPLE:
@@ -99,6 +101,8 @@ IMPORTANT CONTEXT FOR ACCURATE SCORING:
 - Security tool repositories (scanners, linters, pentest tools) legitimately use subprocess, shell patterns, and references to malware/security strings. These are NOT vulnerabilities in that context.
 - Subprocess calls using list form (not shell=True) are safe and should not meaningfully raise the score.
 - Low/medium SAST findings without secrets or real CVEs should NOT push the score above 35.
+- Dependency findings marked "is_dev: true" are dev/build tools not shipped to production — weight these 3× less than runtime deps.
+- Popular open-source projects (React, Next.js, TypeScript, Vite, etc.) often have known CVEs in dev tooling — this does NOT make them "dangerous".
 
 SCORING RUBRIC — follow this strictly:
 - 0–10   (clean): Zero real issues. Only info-level or expected tool patterns.
@@ -202,12 +206,16 @@ async def analyze_with_claude(repo_url: str, raw: dict) -> dict:
 
 
 def _no_key_report(raw: dict) -> dict:
-    secrets_count = raw.get("secrets", {}).get("count", 0) or 0
-    sast_findings = raw.get("sast", {}).get("findings", [])
-    sast_tool     = raw.get("sast", {}).get("tool", "unknown")
-    deps_count    = raw.get("dependencies", {}).get("count", 0) or 0
-    malware_crit  = raw.get("malware", {}).get("critical", 0) or 0
-    malware_high  = raw.get("malware", {}).get("high", 0) or 0
+    secrets_count  = raw.get("secrets", {}).get("count", 0) or 0
+    sast_findings  = raw.get("sast", {}).get("findings", [])
+    sast_tool      = raw.get("sast", {}).get("tool", "unknown")
+    all_deps       = raw.get("dependencies", {}).get("findings", [])
+    # Only runtime deps count toward the heuristic score; devDeps are low-weight
+    runtime_deps   = [f for f in all_deps if not f.get("is_dev")]
+    dev_deps       = [f for f in all_deps if f.get("is_dev")]
+    deps_count     = len(runtime_deps) + len(dev_deps) // 3
+    malware_crit   = raw.get("malware", {}).get("critical", 0) or 0
+    malware_high   = raw.get("malware", {}).get("high", 0) or 0
 
     sast_bd = _sev_breakdown(sast_findings, sast_tool)
     score   = _weighted_score(secrets_count, sast_bd, deps_count, malware_crit, malware_high)
@@ -223,7 +231,7 @@ def _no_key_report(raw: dict) -> dict:
     else:
         severity = "critical"
 
-    total = secrets_count + len(sast_findings) + deps_count
+    total = secrets_count + len(sast_findings) + len(all_deps)
     return {
         "severity": severity,
         "risk_score": score,

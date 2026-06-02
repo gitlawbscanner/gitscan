@@ -4,15 +4,24 @@ import os
 import re
 
 
-SKIP_DIRS = {".git", "node_modules", "__pycache__", ".venv", "venv", "dist", "build"}
+SKIP_DIRS = {
+    ".git", "node_modules", "__pycache__", ".venv", "venv", "vendor",
+    "dist", "build", ".next", "out", "coverage", ".turbo", ".cache",
+    "__tests__", "fixtures", "testdata", ".nuxt", ".output",
+    "storybook-static", "generated", "gen", ".pytest_cache",
+    "test", "tests", "spec", "e2e", "cypress", ".husky",
+}
+
+TEST_FILE_PATTERNS = re.compile(
+    r"(?:\.test\.|\.spec\.|_test\.|_spec\.)|(?:test_|spec_)|(?:/__tests__/)|(?:/fixtures/)|(?:/testdata/)"
+)
 
 # Basic pattern-based SAST as last resort
 BASIC_PATTERNS = {
     "python": {
         "SQL Injection Risk":     r"(?i)(execute|cursor\.execute)\s*\(\s*['\"].*%[s|d]",
         "eval() Usage":           r"(?<![_\w])eval\s*\(",
-        "Shell Injection Risk":   r"(?i)(os\.system|subprocess\.call|popen)\s*\([^)]*\+[^)]*\)",
-        "Hardcoded Debug":        r"(?i)^[^#]*DEBUG\s*=\s*True",
+        "Shell Injection Risk":   r"(?i)(os\.system|popen)\s*\([^)]*\+\s*(?:req\.|request\.|user|input|param)",
         "pickle.loads":           r"pickle\.loads\s*\(",
         "MD5/SHA1 Usage":         r"hashlib\.(md5|sha1)\s*\(",
     },
@@ -90,6 +99,15 @@ async def scan_sast(repo_path: str) -> dict:
             "semgrep", "--config=auto", "--json", "--quiet",
             "--severity", "ERROR",
             "--timeout", "30",
+            "--exclude", "*.test.*",
+            "--exclude", "*.spec.*",
+            "--exclude-dir", "tests",
+            "--exclude-dir", "test",
+            "--exclude-dir", "__tests__",
+            "--exclude-dir", "spec",
+            "--exclude-dir", "e2e",
+            "--exclude-dir", "fixtures",
+            "--exclude-dir", "coverage",
             repo_path,
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
@@ -107,10 +125,20 @@ async def scan_sast(repo_path: str) -> dict:
     # 2. Try Bandit (Python only) — skip subprocess noise, medium+ only
     if _has_python(repo_path):
         try:
-            proc = await asyncio.create_subprocess_exec(
+            _bandit_exclude = ",".join([
+                os.path.join(repo_path, d)
+                for d in ("tests", "test", "__tests__", "spec", "e2e", "fixtures", "coverage")
+                if os.path.isdir(os.path.join(repo_path, d))
+            ])
+            bandit_cmd = [
                 "bandit", "-r", repo_path, "-f", "json", "-q",
-                "-ll",                    # medium severity and above
-                "-s", _BANDIT_SKIP,       # skip subprocess-related tests
+                "-ll",              # medium severity and above
+                "-s", _BANDIT_SKIP, # skip subprocess-related tests
+            ]
+            if _bandit_exclude:
+                bandit_cmd += ["-x", _bandit_exclude]
+            proc = await asyncio.create_subprocess_exec(
+                *bandit_cmd,
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
             )
@@ -145,6 +173,9 @@ async def _basic_sast(repo_path: str) -> dict:
             lang = EXT_LANG.get(ext, "generic")
             patterns = {**BASIC_PATTERNS.get(lang, {}), **BASIC_PATTERNS["generic"]}
             fpath = os.path.join(root, fname)
+            rel = os.path.relpath(fpath, repo_path).replace("\\", "/")
+            if TEST_FILE_PATTERNS.search(rel):
+                continue
             try:
                 if os.path.getsize(fpath) > 300_000:
                     continue

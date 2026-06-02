@@ -236,6 +236,11 @@ async def search_repos(q: str = Query("", min_length=0), limit: int = Query(20, 
     return results[:limit]
 
 
+@app.get("/history")
+async def get_scan_history(repo: str = Query(...), limit: int = Query(30, le=100)):
+    return await database.get_history(repo.strip().rstrip("/"), limit)
+
+
 @app.get("/badge")
 async def get_badge(repo: str = Query(...)):
     scans = await database.get_recent(500) if database.is_enabled() else recent_scans

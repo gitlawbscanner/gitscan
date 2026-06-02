@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import PageNav from '../components/PageNav';
 import RadarChart from '../components/RadarChart';
+import ScoreHistoryChart from '../components/ScoreHistoryChart';
 
 const API = import.meta.env.VITE_API_URL || '/api';
 
@@ -85,6 +86,7 @@ export default function ReportPage() {
   const [error, setError] = useState('');
   const [copied, setCopied] = useState(false);
   const [badgeCopied, setBadgeCopied] = useState(false);
+  const [exporting, setExporting] = useState(false);
 
   useEffect(() => {
     if (!jobId) return;
@@ -114,6 +116,19 @@ export default function ReportPage() {
   const badgeMd = `[![gitscan score](https://img.shields.io/badge/gitscan-${report?.risk_score || '?'}%2F100-${report?.severity === 'critical' ? 'red' : report?.severity === 'high' ? 'orange' : report?.severity === 'medium' ? 'yellow' : 'brightgreen'})](${badgeUrl})`;
 
   const isCritical = report?.severity === 'critical' || (report?.risk_score ?? 0) >= 85;
+
+  const exportJSON = () => {
+    if (!data) return;
+    setExporting(true);
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `gitscan-${repoName.replace(/[^a-z0-9]/gi, '_')}-${jobId}.json`;
+    a.click();
+    setTimeout(() => setExporting(false), 1000);
+  };
+
+  const printPDF = () => window.print();
 
   return (
     <div style={{ background: '#000', minHeight: '100vh', color: '#fff', position: 'relative', overflow: 'hidden' }}>
@@ -190,6 +205,16 @@ export default function ReportPage() {
                   color: 'rgba(255,255,255,0.45)', padding: '8px 16px',
                   fontFamily: "'IBM Plex Mono', monospace", fontSize: 10, cursor: 'pointer', letterSpacing: '0.08em',
                 }}>↺ RESCAN</button>
+                <button onClick={exportJSON} disabled={exporting} style={{
+                  background: 'transparent', border: '1px solid rgba(255,255,255,0.1)',
+                  color: 'rgba(255,255,255,0.45)', padding: '8px 16px',
+                  fontFamily: "'IBM Plex Mono', monospace", fontSize: 10, cursor: 'pointer', letterSpacing: '0.08em',
+                }}>⬇ JSON</button>
+                <button onClick={printPDF} style={{
+                  background: 'transparent', border: '1px solid rgba(255,255,255,0.1)',
+                  color: 'rgba(255,255,255,0.45)', padding: '8px 16px',
+                  fontFamily: "'IBM Plex Mono', monospace", fontSize: 10, cursor: 'pointer', letterSpacing: '0.08em',
+                }}>⎙ PDF</button>
               </div>
             </div>
 
@@ -229,6 +254,9 @@ export default function ReportPage() {
               </div>
             </div>
 
+            {/* Score history */}
+            <ScoreHistoryChart repoUrl={repoUrl} />
+
             {/* Findings */}
             {report.findings_summary?.length > 0 && (
               <div style={{ marginBottom: 28 }}>
@@ -266,6 +294,13 @@ export default function ReportPage() {
         @keyframes radar-pulse {
           0%   { transform: translate(-50%,-50%) scale(0.9); opacity: 0.7; }
           100% { transform: translate(-50%,-50%) scale(1.35); opacity: 0; }
+        }
+        @media print {
+          body { background: #fff !important; color: #000 !important; }
+          nav, button { display: none !important; }
+          * { color: #000 !important; border-color: #ccc !important; background: transparent !important; box-shadow: none !important; filter: none !important; animation: none !important; }
+          a { color: #000 !important; text-decoration: underline !important; }
+          canvas { display: none !important; }
         }
       `}</style>
     </div>

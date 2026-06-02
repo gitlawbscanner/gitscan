@@ -326,6 +326,12 @@ async def run_full_scan(job_id: str, repo_url: str, branch: str = "main"):
         add_recent_scan(repo_url, report.get("risk_score", 0), report.get("severity", "unknown"))
         await _persist_scan(job_id, repo_url, report)
         await database.store_report(job_id, repo_url, report)
+        await database.insert_history(
+            repo_url=repo_url.strip().rstrip("/"),
+            risk_score=report.get("risk_score", 0),
+            severity=report.get("severity", "unknown"),
+            job_id=job_id,
+        )
         scan_jobs[job_id]["status"] = "complete"
         scan_jobs[job_id]["result"] = {
             "repo_url": repo_url,

@@ -1,0 +1,71 @@
+name: 'gitscan Security Scan'
+description: 'AI-powered security scanner for your repository — checks secrets, SAST, CVEs, and malware.'
+author: 'gitlawbscanner'
+
+branding:
+  icon: 'shield'
+  color: 'red'
+
+inputs:
+  repo_url:
+    description: 'Repository URL to scan (defaults to the current repo)'
+    required: false
+    default: ''
+  api_url:
+    description: 'gitscan API base URL'
+    required: false
+    default: 'https://gitscan-production.up.railway.app'
+  fail_on:
+    description: 'Minimum severity to fail the action: critical|high|medium|low|never'
+    required: false
+    default: 'high'
+  score_threshold:
+    description: 'Fail if risk score is at or above this value (0 = disabled)'
+    required: false
+    default: '80'
+  post_comment:
+    description: 'Post scan results as a PR comment (requires GITHUB_TOKEN)'
+    required: false
+    default: 'true'
+  github_token:
+    description: 'GitHub token for posting PR comments'
+    required: false
+    default: ''
+  branch:
+    description: 'Branch to scan'
+    required: false
+    default: 'main'
+
+outputs:
+  job_id:
+    description: 'The gitscan job ID for this scan'
+    value: ${{ steps.scan.outputs.job_id }}
+  risk_score:
+    description: 'Risk score (0–100)'
+    value: ${{ steps.scan.outputs.risk_score }}
+  severity:
+    description: 'Severity level: critical|high|medium|low|clean|unknown'
+    value: ${{ steps.scan.outputs.severity }}
+  report_url:
+    description: 'URL to the full report'
+    value: ${{ steps.scan.outputs.report_url }}
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Run gitscan
+      id: scan
+      shell: bash
+      env:
+        GITSCAN_REPO_URL: ${{ inputs.repo_url }}
+        GITSCAN_API_URL: ${{ inputs.api_url }}
+        GITSCAN_FAIL_ON: ${{ inputs.fail_on }}
+        GITSCAN_SCORE_THRESHOLD: ${{ inputs.score_threshold }}
+        GITSCAN_POST_COMMENT: ${{ inputs.post_comment }}
+        GITSCAN_GITHUB_TOKEN: ${{ inputs.github_token }}
+        GITSCAN_BRANCH: ${{ inputs.branch }}
+        GITHUB_REPOSITORY: ${{ github.repository }}
+        GITHUB_SHA: ${{ github.sha }}
+        GITHUB_EVENT_NAME: ${{ github.event_name }}
+        GITHUB_PR_NUMBER: ${{ github.event.pull_request.number }}
+      run: bash ${{ github.action_path }}/scan.sh

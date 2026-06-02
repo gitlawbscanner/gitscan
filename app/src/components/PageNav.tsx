@@ -4,6 +4,7 @@ const LINKS = [
   { to: '/', label: 'Scan' },
   { to: '/search', label: 'Search' },
   { to: '/compare', label: 'Compare' },
+  { to: '/org', label: 'Org' },
   { to: '/activity', label: 'Latest' },
   { to: '/trending', label: 'Trending' },
   { to: '/intel', label: 'Intel' },

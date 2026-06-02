@@ -35,6 +35,18 @@ CREATE TABLE IF NOT EXISTS reports (
     report     TEXT NOT NULL,
     created_at DOUBLE PRECISION NOT NULL
 );
+
+CREATE TABLE IF NOT EXISTS scan_history (
+    id          BIGSERIAL PRIMARY KEY,
+    repo_url    TEXT NOT NULL,
+    risk_score  INTEGER NOT NULL,
+    severity    TEXT NOT NULL DEFAULT 'unknown',
+    job_id      TEXT,
+    scanned_at  DOUBLE PRECISION NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_scan_history_repo
+    ON scan_history(repo_url, scanned_at DESC);
 """
 
 
@@ -146,3 +158,31 @@ async def get_all_urls() -> set[str]:
     except Exception as e:
         logger.error(f"DB get_all_urls failed: {e}")
         return set()
+
+
+async def insert_history(repo_url: str, risk_score: int, severity: str, job_id: str | None = None) -> None:
+    if not _enabled or _pool is None:
+        return
+    try:
+        async with _pool.acquire() as conn:
+            await conn.execute(
+                "INSERT INTO scan_history (repo_url, risk_score, severity, job_id, scanned_at) VALUES ($1, $2, $3, $4, $5)",
+                repo_url, risk_score, severity, job_id, time.time(),
+            )
+    except Exception as e:
+        logger.error(f"DB insert_history failed: {e}")
+
+
+async def get_history(repo_url: str, limit: int = 30) -> list[dict]:
+    if not _enabled or _pool is None:
+        return []
+    try:
+        async with _pool.acquire() as conn:
+            rows = await conn.fetch(
+                "SELECT * FROM scan_history WHERE repo_url = $1 ORDER BY scanned_at DESC LIMIT $2",
+                repo_url, limit,
+            )
+        return [dict(r) for r in rows]
+    except Exception as e:
+        logger.error(f"DB get_history failed: {e}")
+        return []

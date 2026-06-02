@@ -12,6 +12,7 @@ import SearchPage from './pages/SearchPage';
 import ComparePage from './pages/ComparePage';
 import InstallPage from './pages/InstallPage';
 import ApiDocsPage from './pages/ApiDocsPage';
+import OrgScanPage from './pages/OrgScanPage';
 import PageTransition from './components/PageTransition';
 
 function App() {
@@ -42,6 +43,7 @@ function App() {
         <Route path="/compare" element={<ComparePage />} />
         <Route path="/install" element={<InstallPage />} />
         <Route path="/api-docs" element={<ApiDocsPage />} />
+        <Route path="/org" element={<OrgScanPage />} />
       </Routes>
     </PageTransition>
   );

@@ -65,7 +65,7 @@ function RepoInput({ label, value, onChange, loading, onScan }: {
   );
 }
 
-function ScorePanel({ report, side }: { report: Report; side: 'left' | 'right' }) {
+function ScorePanel({ report }: { report: Report; side?: 'left' | 'right' }) {
   const mono: React.CSSProperties = { fontFamily: "'IBM Plex Mono', monospace" };
   const r = report.report;
   const sev = (r.severity || 'unknown').toLowerCase();

@@ -88,7 +88,6 @@ export default function ThreatGlobe({ criticalCount, size = 160 }: Props) {
         if (z < 0) return;
 
         const pulse = 0.5 + 0.5 * Math.sin(now / 800 + dot.lon);
-        const col = dot.critical ? '#ff4444' : '#888';
 
         // Pulse ring for critical
         if (dot.critical) {
